@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "995024278200",
+    "project_id": "taco-eda5b",
+    "storage_bucket": "taco-eda5b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:995024278200:android:da595f60cf618aa753da4d",
+        "android_client_info": {
+          "package_name": "com.example.taco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCb_vhNvh0uggyIlyKvFFDnDMQsVVt4JJE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
