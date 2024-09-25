@@ -1,4 +1,4 @@
-package com.example.taco.DataRepository
+package com.example.taco.DataRepository.Image
 import com.example.taco.R
 class ImageList {
     val imageResId = listOf(

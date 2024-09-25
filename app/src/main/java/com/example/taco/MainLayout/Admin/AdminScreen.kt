@@ -1,8 +1,6 @@
-package com.example.taco.MainLayout
+package com.example.taco.MainLayout.Admin
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -27,14 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 //import com.example.taco.Data.DatabaseTACO
-import com.example.taco.FirebaseAPI.FirestoreHelper
-import com.example.taco.FirebaseAPI.Product
-import android.util.Base64
-import androidx.compose.ui.text.TextStyle
-import com.example.taco.FirebaseAPI.base64ToBitmap
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
+import java.util.UUID
 
 @Composable
 fun AdminScreen(navController: NavController, context: Context) {
+    val firestoreHelper = remember { FirestoreHelper() }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -46,13 +43,11 @@ fun AdminScreen(navController: NavController, context: Context) {
         Button(
             onClick = { navController.navigate("add") },
             modifier = Modifier
-                .fillMaxWidth(0.5f)
-                .padding(vertical = 16.dp),
+                .fillMaxWidth(0.5f),
             colors = ButtonDefaults.buttonColors(containerColor = Color(190, 160, 120))
         ) {
             Text("Add a Product")
         }
-
         // New section for managing products (update and delete)
         ManageProductsScreen(navController, context)
     }
@@ -60,33 +55,10 @@ fun AdminScreen(navController: NavController, context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminTopBar(navController: NavController) {
-    CenterAlignedTopAppBar(
-        title = { Text("Admin") },
-        navigationIcon = {
-            IconButton(onClick = { navController.navigate("home") }) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.White
-                )
-            }
-        },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color(181, 136, 99),
-            titleContentColor = Color.White
-        )
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun ManageProductsScreen(navController: NavController, context: Context) {
     // Create an instance of FirestoreHelper
     val firestoreHelper = remember { FirestoreHelper() }
-    var isLoading by remember {
-        mutableStateOf(false)
-    }
+    var isLoading by remember { mutableStateOf(false) }
     // State to hold the list of products
     var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
@@ -118,17 +90,12 @@ fun ManageProductsScreen(navController: NavController, context: Context) {
                 onValueChange = { query ->
                     searchQuery = query
                 },
-                textStyle = TextStyle(
-                    color = Color.White
-                ),
-                colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = Color.White,
+                label = { Text("Tìm kiếm sản phẩm", color = Color.White) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    cursorColor = Color.White,
+                    focusedBorderColor = Color(190, 160, 120),
                     unfocusedBorderColor = Color.White,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
                 ),
-                label = { Text("Tìm kiếm sản phẩm",
-                    color = Color.White) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(30.dp)
@@ -186,8 +153,10 @@ fun ProductRow(
     onDelete: @Composable (String) -> Unit,
     navController: NavController
 ) {
+    val firestoreHelper = remember { FirestoreHelper() }
+
     var showDialog by remember { mutableStateOf(false) }
-    val imageBitmap = product.image?.let { base64ToBitmap(it)?.asImageBitmap() }
+    val imageBitmap = product.image?.let { firestoreHelper.base64ToBitmap(it)?.asImageBitmap() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -242,7 +211,7 @@ fun ProductRow(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Update Product",
-                    tint = Color.Blue
+                    tint = Color.White
                 )
             }
             Text(
@@ -272,6 +241,7 @@ fun ProductRow(
     }
     if (showDialog) {
         AlertDialog(
+            containerColor = Color(181, 136, 99),
             onDismissRequest = { showDialog = false },
             title = { Text("Xác nhận xoá") },
             text = { Text("Bạn có chắc chắn xoá sản phẩm này khỏi hệ thống?") },
@@ -279,24 +249,49 @@ fun ProductRow(
                 TextButton(
                     onClick = {
                         // Call the Firestore delete method
-                        val firestoreHelper = FirestoreHelper() // Initialize FirestoreHelper
                         firestoreHelper.deleteProductById(product.productId)
                         showDialog = false
                         // Optionally, trigger a refresh of the product list
                         navController.navigate("admin")
                     }
                 ) {
-                    Text("Xác nhận")
+                    Text(
+                        "Xác nhận",
+                        color = Color.White
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showDialog = false }
                 ) {
-                    Text("Huỷ")
+                    Text(
+                        "Huỷ",
+                        color = Color.White
+                    )
                 }
             }
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdminTopBar(navController: NavController) {
+    CenterAlignedTopAppBar(
+        title = { Text("Admin") },
+        navigationIcon = {
+            IconButton(onClick = { navController.navigate("home") }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
+            }
+        },
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+            containerColor = Color(181, 136, 99),
+            titleContentColor = Color.White
+        )
+    )
+}

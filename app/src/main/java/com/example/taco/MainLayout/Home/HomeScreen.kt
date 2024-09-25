@@ -1,5 +1,7 @@
-package com.example.taco.MainLayout
+package com.example.taco.MainLayout.Home
 
+
+import CustomerDatabase
 import android.app.Activity
 import android.content.Context
 import androidx.compose.foundation.*
@@ -18,15 +20,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.taco.DataRepository.DatabaseTACO
-import com.example.taco.DataRepository.ImageList
+import com.example.taco.DataRepository.Image.ImageList
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.Account
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
+import com.example.taco.MainLayout.Admin.AdminScreen
+import com.example.taco.MainLayout.Admin.AdminTopBar
+
 import com.example.taco.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import com.example.taco.MainLayout.GlobalLoginVariables.AdminName
+import kotlin.math.tan
 
 @Composable
 fun HomeScreen(
@@ -34,10 +42,14 @@ fun HomeScreen(
     drawerState: DrawerState,
     scope: CoroutineScope,
     context: Context,
-
 ) {
-    DrawerMenu(navController, drawerState, scope, context)
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        DrawerMenu(navController, drawerState, scope, context)
+    }
 }
+
 @Composable
 fun DrawerMenu(
     navController: NavController,
@@ -68,7 +80,6 @@ fun DrawerMenu(
 fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: CoroutineScope) {
     val showDialog = remember { mutableStateOf(false) }
     val context = LocalContext.current
-
     Box(
         modifier = Modifier
             .fillMaxWidth(0.8f)
@@ -85,7 +96,7 @@ fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: 
                 modifier = Modifier
                     .padding(top = 55.dp, start = 7.dp)
             ) {
-                Icon(Icons.Default.Menu, contentDescription = "Close Menu")
+                Icon(Icons.Default.Menu, contentDescription = "Close Menu", tint = Color.White)
             }
 
             Row(
@@ -149,13 +160,20 @@ fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: 
                         )
 
                         Spacer(modifier = Modifier.width(8.dp))
-                        if(AdminName.isNotEmpty()){
+                        val sql = CustomerDatabase(LocalContext.current)
+                        val customerNames = sql.getAllCustomers()
+                        val cusName = customerNames[0].customerName
+                        val cusPhone = customerNames[0].customerNumPhone
+
+
+                        if(cusName.isNotEmpty()){
                             Text(
-                                text = "Hello ${AdminName}!",
+                                text = "Hello ${cusName}!. Số điện thoại của bạn: $cusPhone ",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontSize = 15.sp
                             )
-                        } else{
+                        }
+                        else{
                             Text(
                                 text = "Login",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -196,19 +214,22 @@ fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: 
 
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Exit", // Change the text to "Exit"
+                            text = "Thoát người dùng.", // Change the text to "Exit"
                             style = MaterialTheme.typography.bodyMedium,
                             fontSize = 15.sp
                         )
                     }
+                    val sqlite = CustomerDatabase(LocalContext.current)
+
                     if (showDialog.value) {
                         AlertDialog(
                             onDismissRequest = { showDialog.value = false },
                             title = { Text("Xác nhận thoát") },
-                            text = { Text("Bạn có chắc chắn thoát ứng dụng ?") },
+                            text = { Text("Bạn có chắc chắn thoát người dùng ?") },
                             confirmButton = {
                                 TextButton(
                                     onClick = {
+                                        sqlite.deleteAllCustomers()
                                         (context as? Activity)?.finishAffinity()
                                     }
                                 ) {
@@ -217,7 +238,9 @@ fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: 
                             },
                             dismissButton = {
                                 TextButton(
-                                    onClick = { showDialog.value = false }
+                                    onClick = {
+                                        showDialog.value = false
+                                    }
                                 ) {
                                     Text("Hủy bỏ")
                                 }
@@ -239,26 +262,22 @@ fun TopBotAppBar(
     context: Context,
 
 ) {
-    val dbhelper = DatabaseTACO(context)
     var selectedTab by remember { mutableIntStateOf(0) }
     Scaffold(
 
         topBar = {
             when(selectedTab){
                 0 -> {
-                    HomeTopBar(drawerState, scope)
+                    HomeTopBar(navController, drawerState, scope)
                 }
                 1 -> SearchTopBar()
-                2 -> CartTopBar()
                 3 -> PaymentsTopBar()
                 4 -> AdminTopBar(navController)
             }
         },
 
         bottomBar = {
-            BottomNavigationBar(navController, selectedTab) { index ->
-                selectedTab = index
-            }
+            BottomNavigationBar(navController, selectedTab, onTabSelected = { index -> selectedTab = index})
         }
     ) { pad ->
         Box(
@@ -277,45 +296,6 @@ fun TopBotAppBar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HomeTopBar(drawerState: DrawerState, scope: CoroutineScope) {
-    Column {
-        CenterAlignedTopAppBar(
-            title = { Text("Home") },
-            navigationIcon = {
-                IconButton(
-                    onClick = {
-                        scope.launch {
-                            if (drawerState.isClosed) drawerState.open() else drawerState.close()
-                        }
-                    }
-                ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Menu Icon")
-                }
-            },
-            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                containerColor = Color(181, 136, 99),
-                titleContentColor = Color.White
-            )
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.coffeebackground),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(250.dp)
-            )
-            ImageRow()
-        }
-    }
-}
 
 @Composable
 fun BottomNavigationBar(navController: NavController, selectedTab: Int, onTabSelected: (Int) -> Unit) {
@@ -339,7 +319,7 @@ fun BottomNavigationBar(navController: NavController, selectedTab: Int, onTabSel
             icon = { Icon(Icons.Filled.ShoppingCart, contentDescription = "OrderConfirm") },
             label = { Text("Cart", color = Color.White) },
             selected = selectedTab == 2,
-            onClick = { onTabSelected(2) }
+            onClick = { navController.navigate("cart") },
         )
         NavigationBarItem(
             icon = { Icon(Icons.Filled.Payment, contentDescription = "Cart") },
@@ -347,19 +327,22 @@ fun BottomNavigationBar(navController: NavController, selectedTab: Int, onTabSel
             selected = selectedTab == 3,
             onClick = { onTabSelected(3) }
         )
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Person, contentDescription = "Admin") },
-            label = { Text("Admin", color = Color.White) },
-            selected = selectedTab == 4,
-            onClick = { navController.navigate("admin") },
-            enabled = true
-        )
+        if(true){ //isAdminCheck.value
+            NavigationBarItem(
+                icon = { Icon(Icons.Filled.Person, contentDescription = "Admin") },
+                label = { Text("Admin", color = Color.White) },
+                selected = selectedTab == 4,
+                onClick = { navController.navigate("admin") },
+                enabled = true
+            )
+        }
     }
 }
 
 @Composable
 fun ImageRow() {
     val images = ImageList().imageResId
+
     LazyRow {
         items(images.size) { index ->
             Image(
@@ -371,10 +354,16 @@ fun ImageRow() {
             )
         }
     }
+
 }
 
 @Composable
 fun CategoryScreen(navController: NavController) {
+    val firestoreHelper = remember { FirestoreHelper() }
+    val coroutineScope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
+
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -382,49 +371,88 @@ fun CategoryScreen(navController: NavController) {
             .fillMaxSize()
             .background(Color(181, 136, 99))
             .padding(top = 150.dp)
-    ) {
+            .verticalScroll(scrollState)
 
-        Text(
-            text = "Hoping you enjoys our service!",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 10.dp, top = 70.dp),
-            color = Color.White
-        )
-        Row {
-            CategoryButton(
-                imageResId = R.drawable.cake,
-                label = "Cake",
-                onClick = { navController.navigate("cake") }
-            )
-            CategoryButton(
-                imageResId = R.drawable.coffee,
-                label = "Coffee",
-                onClick = { navController.navigate("coffee") }
-            )
-            CategoryButton(
-                imageResId = R.drawable.juice,
-                label = "Juices",
-                onClick = { navController.navigate("juice") }
-            )
-            CategoryButton(
-                imageResId = R.drawable.milktea,
-                label = "Milk Tea",
-                onClick = { navController.navigate("milktea") }
-            )
-        }
-        Row {
-            CategoryButton(
-                imageResId = R.drawable.otherdrinks,
-                label = "Other",
-                onClick = { navController.navigate("other") }
-            )
-        }
-        HorizontalDivider(
-            color = Color.Black, // Màu của đường kẻ
-            thickness = 1.dp, // Độ dày của đường kẻ
+    ) {
+        Spacer(modifier = Modifier.height(64.dp))
+
+        Column(
             modifier = Modifier
-                .padding(start = 30.dp, end = 30.dp)// Khoảng cách giữa các phần tử và đường kẻ
-        )
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row {
+                Text(
+                    text = "TACO Coffee Shop chúc bạn một ngày tốt lành! ",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(bottom = 10.dp, top = 50.dp),
+                    color = Color.White,
+                    fontSize = 15.sp
+                )
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = "Heart",
+                    tint = Color.Red,
+                    modifier = Modifier.padding(bottom = 10.dp, top = 50.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            HorizontalDivider(
+                color = Color.White, // Màu của đường kẻ
+                thickness = 1.dp, // Độ dày của đường kẻ
+                modifier = Modifier
+                    .padding(start = 30.dp, end = 30.dp)// Khoảng cách giữa các phần tử và đường kẻ
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp)
+            ) {
+
+                CategoryButton(
+                    imageResId = R.drawable.cake,
+                    label = "Bánh",
+                    onClick = { navController.navigate("cake") }
+                )
+                CategoryButton(
+                    imageResId = R.drawable.coffee,
+                    label = "Cà phê",
+                    onClick = { navController.navigate("coffee") }
+                )
+                CategoryButton(
+                    imageResId = R.drawable.juice,
+                    label = "Nước ép",
+                    onClick = { navController.navigate("juice") }
+                )
+                CategoryButton(
+                    imageResId = R.drawable.milktea,
+                    label = "Trà sữa",
+                    onClick = { navController.navigate("milktea") }
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp)
+            ) {
+                CategoryButton(
+                    imageResId = R.drawable.otherdrinks,
+                    label = "Món khác",
+                    onClick = { navController.navigate("other") }
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(
+                color = Color.White, // Màu của đường kẻ
+                thickness = 1.dp, // Độ dày của đường kẻ
+                modifier = Modifier
+                    .padding(start = 30.dp, end = 30.dp)// Khoảng cách giữa các phần tử và đường kẻ
+            )
+        }
     }
 }
 
@@ -440,8 +468,8 @@ fun CategoryButton(
     ) {
         Box(
             modifier = Modifier
-                .size(70.dp)
-                .background(Color.LightGray, shape = CircleShape)
+                .size(60.dp)
+                .background(Color(190, 160, 120), shape = CircleShape)
                 .clickable(onClick = onClick)
         ) {
             Image(
@@ -449,7 +477,8 @@ fun CategoryButton(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .align(Alignment.Center)
+                    .size(45.dp)
                     .clip(CircleShape)
             )
         }
@@ -461,3 +490,55 @@ fun CategoryButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeTopBar(navController: NavController, drawerState: DrawerState, scope: CoroutineScope) {
+
+    Column {
+        CenterAlignedTopAppBar(
+            title = { Text("Home") },
+            navigationIcon = {
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu Icon", tint = Color.White)
+                }
+            },
+
+            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                containerColor = Color(181, 136, 99),
+                titleContentColor = Color.White
+            )
+        )
+        HorizontalDivider(
+            color = Color(190, 160, 120), // Màu của đường kẻ
+            thickness = 3.dp, // Độ dày của đường kẻ
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+
+            Image(
+                painter = painterResource(id = R.drawable.coffeebackground),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+            )
+
+            ImageRow()
+
+        }
+        HorizontalDivider(
+            color = Color(190, 160, 120), // Màu của đường kẻ
+            thickness = 3.dp, // Độ dày của đường kẻ
+        )
+    }
+}

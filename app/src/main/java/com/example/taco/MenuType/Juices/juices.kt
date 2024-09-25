@@ -1,59 +1,50 @@
-package com.example.taco.MenuType
+package com.example.taco.MenuType.Juices
 
 import android.content.Context
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddShoppingCart
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.taco.FirebaseAPI.FirestoreHelper
-import com.example.taco.FirebaseAPI.OrderProduct
-import com.example.taco.FirebaseAPI.Product
-import com.example.taco.FirebaseAPI.base64ToBitmap
-import kotlinx.coroutines.launch
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
+import com.example.taco.MenuType.Cake.ProductRow
 
 @Composable
-fun MilkteaScreen(navController: NavController, context: Context) {
+fun JuiceScreen(navController: NavController, context: Context) {
     val firestoreHelper = remember { FirestoreHelper() }
     var products = remember { mutableStateOf<List<Product>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         isLoading = true
         products.value = firestoreHelper.getAllProducts().filter {
-            it.name.contains("milktea", ignoreCase = true)
+            it.name.contains("juice", ignoreCase = true)
         }
         isLoading = false
     }
 
 
-    Column {
-        MilkteaTopBar(navController)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(181, 136, 99))
+    ) {
+        JuiceTopBar(navController)
 
         Spacer(modifier = Modifier.height(16.dp))
 
         if (isLoading) {
             // Show loading indicator while fetching data
             CircularProgressIndicator(
-                color = Color(181, 136, 99),
+                color = Color.White,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(16.dp)
@@ -61,14 +52,16 @@ fun MilkteaScreen(navController: NavController, context: Context) {
         } else {
             LazyColumn {
                 items(products.value) { product ->
+
                     HorizontalDivider(
-                        color = Color(181, 136, 99),
+                        color = Color.White,
                         thickness = 1.dp,
                         modifier = Modifier
                             .padding(vertical = 8.dp)
                             .padding(start = 16.dp, end = 16.dp)
                     )
-                    ProductRow(navController,product)
+                    ProductRow(navController, product)
+
                 }
             }
         }
@@ -77,9 +70,9 @@ fun MilkteaScreen(navController: NavController, context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MilkteaTopBar(navController: NavController) {
+fun JuiceTopBar(navController: NavController) {
     CenterAlignedTopAppBar(
-        title = { Text("Milktea Products") },
+        title = { Text("Juice Products") },
         navigationIcon = {
             IconButton(onClick = { navController.navigateUp() }) {
                 Icon(
@@ -97,7 +90,7 @@ fun MilkteaTopBar(navController: NavController) {
 }
 
 //@Composable
-//fun MilkteaProductRow(product: Product) {
+//fun JuiceProductRow(product: Product) {
 //    val showDialog = remember { mutableStateOf(false) }
 //    val quantity = remember { mutableStateOf(1) }
 //    val tablenumber = remember { mutableStateOf("") }
