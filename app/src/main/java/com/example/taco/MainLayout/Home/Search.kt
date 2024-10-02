@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,13 +17,15 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 //import com.example.taco.Data.DatabaseTACO
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.OrderProduct
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
-import com.example.taco.MenuType.Cake.ProductRow
+import com.example.taco.MainLayout.MenuType.Cake.ProductRow
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(navController: NavController, context: Context) {
     // Create an instance of FirestoreHelper
     val firestoreHelper = remember { FirestoreHelper() }
+    val orderProducts = remember { mutableStateListOf<OrderProduct>() }
 
     // State to hold the list of products
     var products by remember { mutableStateOf<List<Product>>(emptyList()) }
@@ -33,6 +38,7 @@ fun SearchScreen(navController: NavController, context: Context) {
         products = firestoreHelper.getAllProducts().filter {
             it.name.contains(searchQuery, ignoreCase = true)
         }
+        orderProducts.addAll(firestoreHelper.getAllOrderProducts())
         isLoading = false
     }
 
@@ -41,6 +47,7 @@ fun SearchScreen(navController: NavController, context: Context) {
             .fillMaxSize()
             .background(Color(181, 136, 99))
     ) {
+        SearchTopBar(navController)
         Spacer(modifier = Modifier.height(16.dp))
 
         // Search bar
@@ -78,6 +85,7 @@ fun SearchScreen(navController: NavController, context: Context) {
         } else {
             LazyColumn {
                 items(products) { product ->
+                    orderProducts.filter { it.productId == product.productId }
                     HorizontalDivider(
                         color = Color.White,
                         thickness = 1.dp,
@@ -85,7 +93,7 @@ fun SearchScreen(navController: NavController, context: Context) {
                             .padding(vertical = 8.dp)
                             .padding(start = 16.dp, end = 16.dp)
                     )
-                    ProductRow(navController,product)
+                    ProductRow(navController,product,orderProducts )
                 }
             }
         }
@@ -212,9 +220,31 @@ fun SearchScreen(navController: NavController, context: Context) {
 //}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchTopBar() {
+fun SearchTopBar(navController: NavController) {
     CenterAlignedTopAppBar(
         title = { Text("Search") },
+        navigationIcon = {
+            IconButton(onClick = { navController.navigate("home") }) {
+                Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = {
+                    navController.navigate("cart")
+                }
+            ){
+                Icon(
+                    Icons.Default.ShoppingCart,
+                    contentDescription = "Menu Icon",
+                    tint = Color.White
+                )
+            }
+        },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = Color(181, 136, 99),
             titleContentColor = Color.White

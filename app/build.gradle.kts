@@ -86,6 +86,8 @@ dependencies {
     implementation ("androidx.camera:camera-lifecycle:1.2.0")
     implementation ("com.google.mlkit:barcode-scanning:17.0.0")
     implementation ("com.google.accompanist:accompanist-permissions:0.30.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
+    implementation ("com.google.firebase:firebase-auth:21.1.0")
 
 
 

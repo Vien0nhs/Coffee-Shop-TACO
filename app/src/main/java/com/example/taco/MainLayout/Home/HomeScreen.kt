@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.taco.DataRepository.Image.ImageList
-import com.example.taco.DataRepository.Firestore.FirebaseAPI.Account
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
 import com.example.taco.MainLayout.Admin.AdminScreen
 import com.example.taco.MainLayout.Admin.AdminTopBar
+import com.example.taco.MainLayout.Login.Admin
 
 import com.example.taco.R
 import kotlinx.coroutines.CoroutineScope
@@ -168,7 +168,7 @@ fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: 
 
                         if(cusName.isNotEmpty()){
                             Text(
-                                text = "Hello ${cusName}!. Số điện thoại của bạn: $cusPhone ",
+                                text = "Hello ${cusName}! Số điện thoại của bạn: $cusPhone ",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontSize = 15.sp
                             )
@@ -230,7 +230,7 @@ fun DrawerContent(navController: NavController,drawerState: DrawerState, scope: 
                                 TextButton(
                                     onClick = {
                                         sqlite.deleteAllCustomers()
-                                        (context as? Activity)?.finishAffinity()
+                                        navController.navigate("login")
                                     }
                                 ) {
                                     Text("Chấp nhận")
@@ -270,7 +270,6 @@ fun TopBotAppBar(
                 0 -> {
                     HomeTopBar(navController, drawerState, scope)
                 }
-                1 -> SearchTopBar()
                 3 -> PaymentsTopBar()
                 4 -> AdminTopBar(navController)
             }
@@ -285,8 +284,8 @@ fun TopBotAppBar(
                 .padding(pad)) {
             when (selectedTab) {
                 1 -> SearchScreen(navController, context)
-                2 -> CartScreen(navController)
-                3 -> PaymentsScreen()
+//                2 -> CartScreen(navController)
+//                3 -> PaymentsScreen()
                 4 -> AdminScreen(navController, context)
             }
         }
@@ -313,21 +312,21 @@ fun BottomNavigationBar(navController: NavController, selectedTab: Int, onTabSel
             icon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
             label = { Text("Search", color = Color.White) },
             selected = selectedTab == 1,
-            onClick = { onTabSelected(1) }
+            onClick = { navController.navigate("search") }
         )
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.ShoppingCart, contentDescription = "OrderConfirm") },
-            label = { Text("Cart", color = Color.White) },
-            selected = selectedTab == 2,
-            onClick = { navController.navigate("cart") },
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Payment, contentDescription = "Cart") },
-            label = { Text("Payments", color = Color.White) },
-            selected = selectedTab == 3,
-            onClick = { onTabSelected(3) }
-        )
-        if(true){ //isAdminCheck.value
+//        NavigationBarItem(
+//            icon = { Icon(Icons.Filled.ShoppingCart, contentDescription = "Cart") },
+//            label = { Text("Cart", color = Color.White) },
+//            selected = selectedTab == 2,
+//            onClick = { navController.navigate("cart") },
+//        )
+//        NavigationBarItem(
+//            icon = { Icon(Icons.Filled.Payment, contentDescription = "Payments") },
+//            label = { Text("Payments", color = Color.White) },
+//            selected = selectedTab == 3,
+//            onClick = { onTabSelected(3) }
+//        )
+        if(Admin.adminMode){ //isAdminCheck.value
             NavigationBarItem(
                 icon = { Icon(Icons.Filled.Person, contentDescription = "Admin") },
                 label = { Text("Admin", color = Color.White) },
@@ -359,8 +358,6 @@ fun ImageRow() {
 
 @Composable
 fun CategoryScreen(navController: NavController) {
-    val firestoreHelper = remember { FirestoreHelper() }
-    val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
 
@@ -410,7 +407,8 @@ fun CategoryScreen(navController: NavController) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp)
+                    .padding(start = 16.dp, end = 16.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
 
                 CategoryButton(
@@ -434,11 +432,15 @@ fun CategoryScreen(navController: NavController) {
                     onClick = { navController.navigate("milktea") }
                 )
             }
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp)
-            ) {
+                    .padding(start = 16.dp, end = 16.dp),
+                horizontalArrangement = Arrangement.Center
+
+                ) {
                 CategoryButton(
                     imageResId = R.drawable.otherdrinks,
                     label = "Món khác",
@@ -506,6 +508,19 @@ fun HomeTopBar(navController: NavController, drawerState: DrawerState, scope: Co
                     }
                 ) {
                     Icon(Icons.Default.Menu, contentDescription = "Menu Icon", tint = Color.White)
+                }
+            },
+            actions = {
+                IconButton(
+                    onClick = {
+                        navController.navigate("cart")
+                    }
+                ){
+                    Icon(
+                        Icons.Default.ShoppingCart,
+                        contentDescription = "Menu Icon",
+                        tint = Color.White
+                    )
                 }
             },
 

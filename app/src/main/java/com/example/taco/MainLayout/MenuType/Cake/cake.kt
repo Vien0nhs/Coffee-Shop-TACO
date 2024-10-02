@@ -1,16 +1,23 @@
-package com.example.taco.MenuType.Cake
+package com.example.taco.MainLayout.MenuType.Cake
 
 import CustomerDatabase
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
@@ -30,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.Customer
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
@@ -43,15 +51,17 @@ fun CakeScreen(navController: NavController) {
     val firestoreHelper = remember { FirestoreHelper() }
     var products = remember { mutableStateOf<List<Product>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-
+    val orderProducts = remember { mutableStateListOf<OrderProduct>() }
     LaunchedEffect(Unit) {
         isLoading = true
         products.value = firestoreHelper.getAllProducts().filter {
             it.name.contains("cake", ignoreCase = true)
         }
+
+        orderProducts.clear()
+        orderProducts.addAll(firestoreHelper.getAllOrderProducts())
         isLoading = false
     }
-
 
 
     Column(
@@ -73,7 +83,7 @@ fun CakeScreen(navController: NavController) {
         } else {
             LazyColumn {
                 items(products.value) { product ->
-
+                    orderProducts.filter { it.productId == product.productId }
                     HorizontalDivider(
                         color = Color.White,
                         thickness = 1.dp,
@@ -81,8 +91,7 @@ fun CakeScreen(navController: NavController) {
                             .padding(vertical = 8.dp)
                             .padding(start = 16.dp, end = 16.dp)
                     )
-                    ProductRow(navController, product)
-
+                    ProductRow(navController, product, orderProducts)
                 }
             }
         }
@@ -92,8 +101,6 @@ fun CakeScreen(navController: NavController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CakeTopBar(navController: NavController) {
-    val firestoreHelper = remember { FirestoreHelper() }
-    val coroutineScope = rememberCoroutineScope() // Tạo coroutine scope
 
     CenterAlignedTopAppBar(
         title = { Text("Cake Products") },
@@ -107,19 +114,7 @@ fun CakeTopBar(navController: NavController) {
             }
         },
         actions = {  // Thêm phần này để định nghĩa các biểu tượng bên phải
-            Row {
 
-                IconButton(onClick = { navController.navigate("cart") }) {
-                    Icon(
-                        imageVector = Icons.Default.ShoppingCart, // Biểu tượng giỏ hàng
-                        contentDescription = "Cart",
-                        tint = Color.White
-                    )
-                }
-                Text(
-                    "($)",
-                )
-            }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = Color(181, 136, 99),
@@ -129,19 +124,21 @@ fun CakeTopBar(navController: NavController) {
 }
 
 @Composable
-fun ProductRow(navController: NavController, product: Product) {
-    val showDialog = remember { mutableStateOf(false) }
+fun ProductRow(navController: NavController, product: Product, orderProduct: List<OrderProduct>) {
+    val showDialog = remember { mutableStateOf(false) } // Biến điều khiển hộp thoại thêm sản phẩm
     val quantity = remember { mutableStateOf(1) }
     val note = remember { mutableStateOf("") }
     val firestoreHelper = remember { FirestoreHelper() }
-    val coroutineScope = rememberCoroutineScope() // Tạo coroutine scope
+    val coroutineScope = rememberCoroutineScope()
+    val productName = remember { mutableStateOf(product.name) }
     val imageBitmap = product.image?.let { firestoreHelper.base64ToBitmap(it)?.asImageBitmap() }
     val sqlite = CustomerDatabase(LocalContext.current)
     val customers = sqlite.getAllCustomers()[0]
-    var name = customers.customerName
-    var phoneNumber = customers.customerNumPhone
-
-
+    val name = customers.customerName
+    val phoneNumber = customers.customerNumPhone
+    val showDialogCart = remember { mutableStateOf(false) } // Biến điều khiển hộp thoại thành công
+    val orderCount = remember { mutableStateOf(0) } // Biến để lưu số lượng sản phẩm trong giỏ hàng
+    // Hiển thị hộp thoại thêm vào giỏ hàng
     if (showDialog.value) {
         AlertDialog(
             containerColor = Color(181, 136, 99),
@@ -151,7 +148,7 @@ fun ProductRow(navController: NavController, product: Product) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Món: ${product.name}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                    Text(text = "Món: ${productName.value}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -189,25 +186,49 @@ fun ProductRow(navController: NavController, product: Product) {
                     onClick = {
                         coroutineScope.launch {
                             val totalPrice = product.price * quantity.value
-                            val newOrderProduct = OrderProduct(
-                                // Tạo các Đơn hàng mới vào API:
-                                orderId = "", // Lưu Id tự động OrderProduct mới.
-                                productId = product.productId, // Lưu Id Product hiện tại.
-                                cusName = name, // Lưu tên khách hàng cục bộ.
-                                phoneNumber = phoneNumber, // Lưu số điện thoại cục bộ.
-                                isProblem = false, // Lưu ban đầu đơn hàng chưa có vấn đề ở phía pha chế.
-                                quantity = quantity.value, // Lưu số lượng sản phẩm.
-                                totalPrice = totalPrice, // Lưu tổng tiền.
-                                note = note.value, // Lưu ghi chú của khách về món.
-                                orderDone = false, // Lưu đơn hàng chưa được giao.
-                                startOrderTime = Date(), // Lưu thời gian bắt đầu đặt hàng.
-                                // orderCompletedTime = ... // Người pha chế sẽ lưu thời gian hoàn thành món tại quán.
-                            )
-                            firestoreHelper.addOrderProduct(newOrderProduct) { documentReference ->
-                                // Xử lý sau khi thêm vào Firestore
+                            val already = firestoreHelper.getAllOrderProducts().filter {
+                                it.phoneNumber == phoneNumber && it.productId == product.productId
+                            }
+                            if(already.isNotEmpty()){
+                                productName.value = already.first().productId
+                                val updateOrderProduct = OrderProduct(
+                                    orderId = already.first().orderId,
+                                    productId = already.first().productId,
+                                    cusName = already.first().cusName,
+                                    phoneNumber = already.first().phoneNumber,
+                                    isProblem = already.first().isProblem,
+                                    quantity = already.first().quantity + quantity.value,
+                                    totalPrice = already.first().totalPrice + totalPrice,
+                                    note = already.first().note + ", " + note.value,
+                                    orderDone = already.first().orderDone,
+                                    isPayCheck = already.first().isPayCheck,
+                                    startOrderTime = already.first().startOrderTime ?: Date()
+                                )
+                                firestoreHelper.updateOrderProductById(already.first().orderId, updateOrderProduct)
+                                orderCount.value = firestoreHelper.getAllOrderProducts().count { it.phoneNumber == phoneNumber }
+                            }
+                            else{
+                                val newOrderProduct = OrderProduct(
+                                    orderId = "",
+                                    productId = product.productId,
+                                    cusName = name,
+                                    phoneNumber = phoneNumber,
+                                    isProblem = false,
+                                    quantity = quantity.value,
+                                    totalPrice = totalPrice,
+                                    note = note.value,
+                                    orderDone = false,
+                                    isPayCheck = false,
+                                    startOrderTime = Date()
+                                )
+                                firestoreHelper.addOrderProduct(newOrderProduct) { documentReference ->
+                                    // Xử lý sau khi thêm vào Firestore
+                                }
+                                orderCount.value = firestoreHelper.getAllOrderProducts().count { it.phoneNumber == phoneNumber }
                             }
                         }
                         showDialog.value = false
+                        showDialogCart.value = true
                     }
                 ) {
                     Text("Thêm vào giỏ của bạn")
@@ -224,6 +245,88 @@ fun ProductRow(navController: NavController, product: Product) {
         )
     }
 
+    // Hiển thị thông báo thành công khi thêm sản phẩm
+    if (showDialogCart.value) {
+
+        AlertDialog(
+            properties = DialogProperties(
+                dismissOnBackPress = false, // Không cho phép đóng khi nhấn phím back
+                dismissOnClickOutside = false // Không cho phép đóng khi nhấn ngoài dialog
+            ),
+            containerColor = Color(181, 136, 99), // Nền màu xanh lá
+            onDismissRequest = { showDialogCart.value = false },
+            title = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Success",
+                        tint = Color.Green,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Thành công!", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Sản phẩm trong giỏ: ${orderCount.value}",
+                        color = Color.White,
+                        fontSize = 16.sp
+                    )
+                    HorizontalDivider(
+                        color = Color.White,
+                        thickness = 1.dp,
+                        modifier = Modifier
+                            .padding(vertical = 8.dp)
+                            .padding(start = 16.dp, end = 16.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Button(
+                        onClick = {
+                            // Điều hướng tới màn hình giỏ hàng
+                            navController.navigate("cart")
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                    ) {
+                        Text(
+                            text = "Đi tới giỏ hàng của bạn",
+                            color = Color.White // Màu xanh lá cho text
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            // Đóng hộp thoại và tiếp tục order
+                            showDialogCart.value = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                    ) {
+                        Text(
+                            text = "Tiếp tục Order",
+                            color = Color.White // Màu xanh lá cho text
+                        )
+                    }
+                }
+            }
+        )
+    }
 
     // Code hiển thị sản phẩm
     Row(
@@ -267,12 +370,14 @@ fun ProductRow(navController: NavController, product: Product) {
                 Icon(
                     imageVector = Icons.Default.ShoppingCart,
                     contentDescription = "Order Product",
-                    tint = Color.Green
+                    tint = Color.White
                 )
             }
             Text(text = "Thêm", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
         }
     }
 }
+
+
 
 

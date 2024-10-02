@@ -1,6 +1,4 @@
-package com.example.taco.MainActivity
-import CustomerDatabase
-import android.graphics.Bitmap
+package com.example.taco
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -9,29 +7,29 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.taco.DataRepository.Firestore.Product.AddProductScreen
+import com.example.taco.MainLayout.Admin.Product.AddProductScreen
 //import com.example.taco.Data.DeleteProductScreen
-import com.example.taco.DataRepository.Firestore.Product.UpdateDetailProductScreen
-import com.example.taco.DataRepository.Firestore.FirebaseAPI.Account
+import com.example.taco.MainLayout.Admin.Product.UpdateDetailProductScreen
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
 //import com.example.taco.Data.UpdateProductScreen
-import com.example.taco.MenuType.Cake.CakeScreen
-import com.example.taco.MenuType.Coffee.CoffeeScreen
-import com.example.taco.MenuType.Juices.JuiceScreen
-import com.example.taco.MenuType.Milktea.MilkteaScreen
-import com.example.taco.MenuType.Drinks.OtherDrinksScreen
+import com.example.taco.MainLayout.MenuType.Cake.CakeScreen
+import com.example.taco.MainLayout.MenuType.Coffee.CoffeeScreen
+import com.example.taco.MainLayout.MenuType.Juices.JuiceScreen
+import com.example.taco.MainLayout.MenuType.Milktea.MilkteaScreen
+import com.example.taco.MainLayout.MenuType.Drinks.OtherDrinksScreen
 import com.example.taco.MainLayout.Admin.AdminScreen
+import com.example.taco.MainLayout.Admin.CashierScreen
 import com.example.taco.MainLayout.Home.CartScreen
+import com.example.taco.MainLayout.Home.CheckoutScreen
 import com.example.taco.MainLayout.Home.HomeScreen
 import com.example.taco.MainLayout.Login.LoginScreen
 import com.example.taco.MainLayout.Home.PaymentsScreen
+import com.example.taco.MainLayout.Home.SearchScreen
 import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +54,6 @@ class MainActivity : ComponentActivity() {
                 val products = firestoreHelper.getAllProducts()
 
                 // Lấy tất cả tài khoản
-                val accounts = firestoreHelper.getAllAccounts()
 
                 // Lấy tất cả bàn
 
@@ -86,6 +83,9 @@ fun Nav(){
         composable("login") { LoginScreen(navController, ) }
         composable("cart") { CartScreen(navController) }
         composable("add") { AddProductScreen(navController, context) }
+        composable("checkout") { CheckoutScreen(navController) }
+        composable("search") { SearchScreen(navController, context) }
+        composable("Cashier") { CashierScreen(navController) }
 //        composable("addtable") { AddTableScreen(navController, context) }
 //        composable("delete") { DeleteProductScreen(navController, context) }
 //        composable("update") { UpdateProductScreen(context, navController) }

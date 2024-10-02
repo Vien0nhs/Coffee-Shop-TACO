@@ -10,7 +10,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RemoveShoppingCart
 import androidx.compose.material3.*
@@ -44,7 +47,7 @@ fun CartScreen(navController: NavController) {
     val firestoreHelper = remember { FirestoreHelper() }
     val sqlite = CustomerDatabase(LocalContext.current)
     val customers = sqlite.getAllCustomers()[0]
-    // Fetch data from Firebase
+    // Get all OrderProduct và Product ở Firebase
     LaunchedEffect(Unit) {
         isLoading = true
         orderProducts.clear()
@@ -56,7 +59,7 @@ fun CartScreen(navController: NavController) {
         }
         isLoading = false
     }
-
+    // Hiển thị theo lazyColumn với Get all đã được gán Id
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -88,7 +91,7 @@ fun CartScreen(navController: NavController) {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Không có sản phẩm nào trong giỏ hàng của bạn.",
+                                text = "Bạn sẽ thấy các món đã đặt tại đây.",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
@@ -120,93 +123,107 @@ fun CartScreen(navController: NavController) {
 fun CartItemRow(navController: NavController, orderProduct: OrderProduct, product: Product) {
     val showDialog = remember { mutableStateOf(false) }
     val showDialog2 = remember { mutableStateOf(false) }
-    val cusName = remember { mutableStateOf(orderProduct.cusName) }
     val quantity = remember { mutableIntStateOf(orderProduct.quantity) }
     val note = remember { mutableStateOf(orderProduct.note) }
     val firestoreHelper = remember { FirestoreHelper() }
+    val sqlite = CustomerDatabase(LocalContext.current)
+    val customers = sqlite.getAllCustomers()
+    val name = customers[0].customerName
+    val phone = customers[0].customerNumPhone
     val coroutineScope = rememberCoroutineScope() // Tạo coroutine scope
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
     ) {
-        // Display product image
-        product.image?.let { imageBase64 ->
-            val bitmap = firestoreHelper.base64ToBitmap(imageBase64)
-            bitmap?.let {
-                Image(
-                    bitmap = it.asImageBitmap(),
-                    contentDescription = null,
+        // Hiển thị các sản phẩm trong giỏ ( Phần thô )
+        Row{
+            // Display product image
+            product.image?.let { imageBase64 ->
+                val bitmap = firestoreHelper.base64ToBitmap(imageBase64)
+                bitmap?.let {
+                    Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Display product and order details in columns
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 8.dp)
+            ) {
+                Text(text = product.name , color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = Color.Black,
+                    thickness = 1.dp,
                     modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
+                        .padding( end = 16.dp)
                 )
+                Text(
+                    text = "Price: ${String.format("%.3f", product.price)} VND" + " x(${orderProduct.quantity})",
+                    color = Color.Black,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text(text = "Tổng giá: ${String.format("%.3f", orderProduct.totalPrice)} VND",color = Color.Black, fontSize = 14.sp)
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = Color.Black,
+                    thickness = 1.dp,
+                    modifier = Modifier
+                        .padding( end = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row{
+                    Text(text = "Ghi chú: ",color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(text = "${orderProduct.note}", color = Color.White, fontSize = 14.sp)
+                }
             }
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        // Display product and order details in columns
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(vertical = 8.dp)
-        ) {
-            Text(text = product.name , fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Price: ${String.format("%.3f", product.price)} VND" + " x(${orderProduct.quantity})",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Text(text = "Tổng giá: ${String.format("%.3f", orderProduct.totalPrice)} VND", fontSize = 14.sp)
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Row{
-                Text(text = "Xin chào: ", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(text = "${orderProduct.cusName}", fontSize = 14.sp)
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row{
-                Text(text = "Ghi chú: ", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(text = "${orderProduct.note}", fontSize = 14.sp)
-            }
-        }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            IconButton(
-                onClick = { showDialog.value = true }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit Order Product",
-                    tint = Color.White
+                IconButton(
+                    onClick = { showDialog.value = true }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Order Product",
+                        tint = Color.White
+                    )
+                }
+                Text(
+                    text = "Sửa",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+                IconButton(
+                    onClick = { showDialog2.value = true }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete Order Product",
+                        tint = Color.White
+                    )
+                }
+                Text(
+                    text = "Xoá",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
                 )
             }
-            Text(
-                text = "Sửa",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
-            IconButton(
-                onClick = { showDialog2.value = true }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.RemoveShoppingCart,
-                    contentDescription = "Delete Order Product",
-                    tint = Color.Red
-                )
-            }
-            Text(
-                text = "Xoá",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
         }
+        // Hiển thị hộp thoại xoá
         if (showDialog2.value) {
             AlertDialog(
                 containerColor = Color(181, 136, 99),
@@ -237,6 +254,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                 }
             )
         }
+        // Hiển thị hộp thoại sửa
         if (showDialog.value) {
             AlertDialog(
                 containerColor = Color(181, 136, 99),
@@ -269,17 +287,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = cusName.value,
-                            onValueChange = { cusName.value = it },
-                            label = { Text("Số bàn", color = Color.Black) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                cursorColor = Color.White,
-                                focusedBorderColor = Color.White,
-                                unfocusedBorderColor = Color.Black,
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
+
                         OutlinedTextField(
                             value = note.value,
                             onValueChange = { note.value = it },
@@ -303,12 +311,12 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                             val updatedOrderProduct = OrderProduct(
                                 orderId = orderProduct.orderId,
                                 productId = product.productId,
+                                cusName = name,
+                                phoneNumber = phone,
                                 quantity = quantity.value,
                                 totalPrice = totalPrice,
-                                cusName = cusName.value,
                                 note = note.value
                             )
-
                             coroutineScope.launch {
                                 // Sửa OrderProduct trong Firestore
                                 firestoreHelper.updateOrderProductById(updatedOrderProduct.orderId, updatedOrderProduct)
@@ -331,32 +339,161 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
     }
 }
 
+// TopBar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartTopBar(navController: NavController) {
     val sqlite = CustomerDatabase(LocalContext.current)
     val customers = sqlite.getAllCustomers()
     val name = customers[0].customerName
-    CenterAlignedTopAppBar( 
+    val phone = customers[0].customerNumPhone
+    val firestore = remember { FirestoreHelper() }
+    val coroutineScope = rememberCoroutineScope()
+
+    val showDeleteDialog = remember { mutableStateOf(false) }  // Control Dialog xoá tất cả
+    val showCheckOutDialog = remember { mutableStateOf(false) } // Control Dialog xác nhận thanh toán
+    val showEmptyCartDialog = remember { mutableStateOf(false) } // Control Dialog giỏ hàng trống
+
+
+    CenterAlignedTopAppBar(
         title = {
-            Text(
-                "Giỏ của bạn $name",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            ) },
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    "Giỏ của: $name",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+
+                IconButton(onClick = {
+                    coroutineScope.launch {
+                        val filter = firestore.getAllOrderProducts().find { it.phoneNumber == phone }
+                        if(filter == null){
+                            showCheckOutDialog.value = false
+                            showEmptyCartDialog.value = true
+                        }
+                        else{
+                            showCheckOutDialog.value = true
+                            showEmptyCartDialog.value = false
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Proceed to Checkout",
+                        tint = Color.White
+                    )
+                }
+            }
+        },
         navigationIcon = {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(onClick = { navController.navigate("home") }) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Default.ArrowBack,
-                    contentDescription = "Back",
+                    imageVector = Icons.Default.Home,
+                    contentDescription = "Home",
+                    tint = Color.White
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = {
+                showDeleteDialog.value = true // Hiển thị dialog khi click vào delete
+            }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Cart",
                     tint = Color.White
                 )
             }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color(181, 136, 99),
+            containerColor = Color(181, 136, 99), // Màu nâu RGB
             titleContentColor = Color.White
         )
     )
+    // Dialog xác nhận giỏ hàng trống
+    if (showEmptyCartDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showEmptyCartDialog.value = false },
+            title = { Text(text = "Giỏ hàng trống", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text(text = "Bạn không có sản phẩm nào trong giỏ hàng!", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = { showEmptyCartDialog.value = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                ) {
+                    Text("Đóng", color = Color.White)
+                }
+            },
+            containerColor = Color(181, 136, 99), // Màu nâu RGB
+            textContentColor = Color.White
+        )
+    }
+    // Dialog xác nhận xoá tất cả món trong giỏ
+    if (showDeleteDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog.value = false },
+            title = { Text(text = "Xoá tất cả sản phẩm", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text(text = "Bạn có chắc chắn muốn xoá tất cả sản phẩm khỏi giỏ hàng?", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            firestore.deleteOrderProductsByPhoneNumber(phone)
+                            firestore.getAllOrderProducts()
+                            navController.navigate("cart") // Cập nhật lại giỏ hàng
+                        }
+                        showDeleteDialog.value = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                ) {
+                    Text("Xoá", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showDeleteDialog.value = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                ) {
+                    Text("Huỷ", color = Color.White)
+                }
+            },
+            containerColor = Color(181, 136, 99), // Màu nâu RGB
+            textContentColor = Color.White
+        )
+    }
+
+    // Dialog xác nhận điều hướng tới trang thanh toán
+    if (showCheckOutDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showCheckOutDialog.value = false },
+            title = { Text(text = "Xác nhận thanh toán", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text(text = "Bạn có chắc chắn muốn tiếp tục tới trang thanh toán?", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Điều hướng tới trang thanh toán (sẽ viết sau)
+                        navController.navigate("checkout")
+                        showCheckOutDialog.value = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                ) {
+                    Text("Xác nhận", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showCheckOutDialog.value = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(181, 136, 99))
+                ) {
+                    Text("Huỷ", color = Color.White)
+                }
+            },
+            containerColor = Color(181, 136, 99), // Màu nâu RGB
+            textContentColor = Color.White
+        )
+    }
 }

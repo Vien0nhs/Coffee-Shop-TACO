@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +48,14 @@ fun AdminScreen(navController: NavController, context: Context) {
             colors = ButtonDefaults.buttonColors(containerColor = Color(190, 160, 120))
         ) {
             Text("Add a Product")
+        }
+        Button(
+            onClick = { navController.navigate("Cashier") },
+            modifier = Modifier
+                .fillMaxWidth(0.5f),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(190, 160, 120))
+        ) {
+            Text("Cashier")
         }
         // New section for managing products (update and delete)
         ManageProductsScreen(navController, context)
@@ -283,7 +292,7 @@ fun AdminTopBar(navController: NavController) {
         navigationIcon = {
             IconButton(onClick = { navController.navigate("home") }) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                    imageVector = Icons.Default.Home,
                     contentDescription = "Back",
                     tint = Color.White
                 )

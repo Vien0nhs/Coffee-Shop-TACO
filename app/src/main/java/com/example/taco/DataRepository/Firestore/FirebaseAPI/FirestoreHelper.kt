@@ -118,11 +118,44 @@ class FirestoreHelper {
     fun base64ToBitmap(base64String: String): Bitmap? {
         return try {
             val decodedString = Base64.decode(base64String, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size)
+
+            // Define the maximum width and height
+            val maxWidth = 800 // Set your desired maximum width
+            val maxHeight = 800 // Set your desired maximum height
+
+            // Khởi tạo options để giải mã ảnh
+            val options = BitmapFactory.Options()
+            options.inJustDecodeBounds = true  // Chỉ đọc kích thước ảnh mà không tải thực tế vào bộ nhớ
+            BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size, options)
+
+            // Tính toán kích thước mẫu
+            options.inSampleSize = calculateInSampleSize(options, maxWidth, maxHeight) // maxWidth, maxHeight là kích thước bạn muốn
+            options.inJustDecodeBounds = false // Bây giờ đọc thật sự ảnh vào bộ nhớ
+            BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size, options)
         } catch (e: IllegalArgumentException) {
             null
         }
     }
+
+    // Tính toán kích thước mẫu
+    fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        // Kích thước gốc của ảnh
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            // Tính toán inSampleSize
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
+    }
+
 
     fun bitmapToBase64(bitmap: Bitmap): String {
         val byteArrayOutputStream = ByteArrayOutputStream()
@@ -142,52 +175,7 @@ class FirestoreHelper {
         )
         db.collection("Product").add(productMap)
     }
-    fun addAccount(account: Account){
-        val accountMap = hashMapOf(
-            "accountName" to account.accountName,
-            "accountUsername" to account.accountUsername,
-            "accountPassword" to account.accountPassword,
-            "accountRole" to account.accountRole,
-            "isAdmin" to account.isAdmin
-        )
-        db.collection("Account").add((accountMap))
-    }
 
-    suspend fun getAccountById(accountId: String): Account? {
-        val document = db.collection("Account").document(accountId).get().await()
-        return if (document.exists()) {
-            Account(
-                accountId = document.id,
-                accountName = document.getString("accountName") ?: "",
-                accountUsername = document.getString("accountUsername") ?: "",
-                accountPassword = document.getString("accountPassword") ?: "",
-                accountRole = document.getString("accountRole") ?: "",
-                isAdmin = document.getBoolean("isAdmin") ?: false
-            )
-        } else null
-    }
-
-    suspend fun getAllAccounts(): List<Account> {
-        val accounts = mutableListOf<Account>()
-        try {
-            val querySnapshot = db.collection("Account").get().await()
-            for (document in querySnapshot.documents) {
-                val account = Account(
-                    accountId = document.id,
-                    accountName = document.getString("accountName") ?: "",
-                    accountUsername = document.getString("accountUsername") ?: "",
-                    accountPassword = document.getString("accountPassword") ?: "",
-                    accountRole = document.getString("accountRole") ?: "",
-                    isAdmin = document.getBoolean("isAdmin") ?: false
-                )
-                accounts.add(account)
-            }
-        } catch (e: Exception) {
-            // Xử lý lỗi nếu có vấn đề xảy ra trong quá trình lấy dữ liệu
-            e.printStackTrace()
-        }
-        return accounts
-    }
 
     // Get All Products
     suspend fun getAllProducts(): List<Product> {
@@ -249,6 +237,7 @@ class FirestoreHelper {
             "totalPrice" to orderProduct.totalPrice,
             "note" to orderProduct.note,
             "orderDone" to orderProduct.orderDone,
+            "isPayCheck" to orderProduct.isPayCheck,
             "startOrderTime" to orderProduct.startOrderTime,
             "orderCompletedTime" to orderProduct.orderCompletedTime
         )
@@ -267,6 +256,7 @@ class FirestoreHelper {
                     productId = document.getString("productId") ?: "",
                     cusName = document.getString("tableId") ?: "",
                     phoneNumber = document.getString("phoneNumber") ?: "",
+                    isPayCheck = document.getBoolean("isPayCheck") ?: false,
                     isProblem = document.getBoolean("isProblem") ?: false,
                     quantity = document.getLong("quantity")?.toInt() ?: 0,
                     totalPrice = document.getDouble("totalPrice") ?: 0.0,
@@ -304,16 +294,37 @@ class FirestoreHelper {
         db.collection("Product").document(productId).delete()
     }
 
+    suspend fun updateOrderProductByFilterList(orderProductList: List<OrderProduct>, isPayCheck: Boolean) {
+        val db = FirebaseFirestore.getInstance()
+
+        orderProductList.forEach { orderProduct ->
+            val orderProductRef = db.collection("OrderProduct").document(orderProduct.orderId)
+
+            // Kiểm tra xem tài liệu có tồn tại không
+            val snapshot = orderProductRef.get().await()
+            if (snapshot.exists()) {
+                // Cập nhật trường isPayCheck
+                orderProductRef.update("isPayCheck", isPayCheck).await()
+            } else {
+                Log.d("Firestore", "Tài liệu không tồn tại: ${orderProduct.orderId}")
+            }
+        }
+    }
+
+
     fun updateOrderProductById(orderProductId: String, updatedOrderProduct: OrderProduct) {
         // Tạo một map chứa các trường cần cập nhật
         val updatedOrderProductMap = hashMapOf<String, Any?>(
             "productId" to updatedOrderProduct.productId,
-            "quantity" to updatedOrderProduct.quantity,
             "cusName" to updatedOrderProduct.cusName,
             "phoneNumber" to updatedOrderProduct.phoneNumber,
             "isProblem" to updatedOrderProduct.isProblem,
+            "quantity" to updatedOrderProduct.quantity,
             "totalPrice" to updatedOrderProduct.totalPrice,
-            "note" to updatedOrderProduct.note
+            "note" to updatedOrderProduct.note,
+            "orderDone" to updatedOrderProduct.orderDone,
+            "startOrderTime" to updatedOrderProduct.startOrderTime,
+            "orderCompletedTime" to updatedOrderProduct.orderCompletedTime
         )
 
         // Cập nhật dữ liệu cho OrderProduct với orderProductId trong Firestore
@@ -336,6 +347,26 @@ class FirestoreHelper {
             e.printStackTrace() // Xử lý lỗi nếu có
         }
     }
+    suspend fun deleteOrderProductsByPhoneNumber(phoneNumber: String) {
+        try {
+            // Truy vấn các orderProduct có phoneNumber khớp
+            val snapshot = db.collection("OrderProduct")
+                .whereEqualTo("phoneNumber", phoneNumber)
+                .get()
+                .await()
+
+            // Xóa từng orderProduct dựa trên orderId
+            for (document in snapshot.documents) {
+                val orderId = document.id
+                db.collection("OrderProduct").document(orderId).delete().await()
+            }
+
+            println("Successfully deleted all orders for phone number: $phoneNumber")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("Error deleting orders for phone number: $phoneNumber - $e")
+        }
+    }
 
 
 
@@ -347,10 +378,6 @@ class FirestoreHelper {
             }
         }
     }
-
-
-
-
 }
 
 data class Product(
@@ -373,6 +400,14 @@ data class OrderProduct(
     val orderDone: Boolean = false,
     val startOrderTime: Date = Date(),
     val orderCompletedTime: Date = Date(),
+    val isPayCheck : Boolean = false
+)
+
+data class OrderHistory(
+    val orderHistoryId: String = "",
+    val orderHistoryDate: Date = Date(),
+    val orderId: String = "",
+    val totalPrice: Double = 0.0
 )
 
 data class Customer (
@@ -381,13 +416,13 @@ data class Customer (
     val phoneNumber: String = ""
 )
 
-
-
 data class Revenue(
     val revenueId: String = "",
     val revenueDate: Date = Date(),
-    val tableId: String = "",
-    val totalRevenue: Double = 0.0
+    val orderId: String = "",
+    val cusName: String = "",
+    val cusPhone: String = "",
+    val totalPrice: Double = 0.0
 )
 
 data class Feedback(
@@ -407,13 +442,4 @@ data class Feedback(
     val feedbackResponseContent: String = "",
     val feedbackResponseRating: Int = 0,
     val feedbackResponseId: String = "",
-)
-
-data class Account(
-    var accountId: String = "",
-    var accountName: String = "",
-    var accountUsername: String = "", // Admin Account
-    var accountPassword: String = "",
-    var accountRole: String = "",
-    var isAdmin: Boolean = false
 )

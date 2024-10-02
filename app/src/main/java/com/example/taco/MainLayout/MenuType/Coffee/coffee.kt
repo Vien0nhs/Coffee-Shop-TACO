@@ -1,4 +1,4 @@
-package com.example.taco.MenuType.Coffee
+package com.example.taco.MainLayout.MenuType.Coffee
 
 import android.content.Context
 import androidx.compose.foundation.background
@@ -15,19 +15,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.OrderProduct
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
-import com.example.taco.MenuType.Cake.ProductRow
+import com.example.taco.MainLayout.MenuType.Cake.ProductRow
 
 @Composable
 fun CoffeeScreen(navController: NavController, context: Context) {
     val firestoreHelper = remember { FirestoreHelper() }
     var products = remember { mutableStateOf<List<Product>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    val orderProducts = remember { mutableStateListOf<OrderProduct>() }
+
     LaunchedEffect(Unit) {
         isLoading = true
         products.value = firestoreHelper.getAllProducts().filter {
             it.name.contains("coffee", ignoreCase = true)
         }
+        orderProducts.clear()
+        orderProducts.addAll(firestoreHelper.getAllOrderProducts())
         isLoading = false
     }
 
@@ -52,7 +57,7 @@ fun CoffeeScreen(navController: NavController, context: Context) {
         } else {
             LazyColumn {
                 items(products.value) { product ->
-
+                    orderProducts.filter { it.productId == product.productId }
                     HorizontalDivider(
                         color = Color.White,
                         thickness = 1.dp,
@@ -60,7 +65,7 @@ fun CoffeeScreen(navController: NavController, context: Context) {
                             .padding(vertical = 8.dp)
                             .padding(start = 16.dp, end = 16.dp)
                     )
-                    ProductRow(navController, product)
+                    ProductRow(navController, product, orderProducts)
 
                 }
             }

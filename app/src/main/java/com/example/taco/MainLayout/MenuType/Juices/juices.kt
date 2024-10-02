@@ -1,4 +1,4 @@
-package com.example.taco.MenuType.Milktea
+package com.example.taco.MainLayout.MenuType.Juices
 
 import android.content.Context
 import androidx.compose.foundation.background
@@ -15,19 +15,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
+import com.example.taco.DataRepository.Firestore.FirebaseAPI.OrderProduct
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
-import com.example.taco.MenuType.Cake.ProductRow
+import com.example.taco.MainLayout.MenuType.Cake.ProductRow
 
 @Composable
-fun MilkteaScreen(navController: NavController, context: Context) {
+fun JuiceScreen(navController: NavController, context: Context) {
     val firestoreHelper = remember { FirestoreHelper() }
     var products = remember { mutableStateOf<List<Product>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    val orderProducts = remember { mutableStateListOf<OrderProduct>() }
+
     LaunchedEffect(Unit) {
         isLoading = true
         products.value = firestoreHelper.getAllProducts().filter {
-            it.name.contains("milktea", ignoreCase = true)
+            it.name.contains("juice", ignoreCase = true)
         }
+        orderProducts.clear()
+        orderProducts.addAll(firestoreHelper.getAllOrderProducts())
         isLoading = false
     }
 
@@ -37,7 +42,7 @@ fun MilkteaScreen(navController: NavController, context: Context) {
             .fillMaxSize()
             .background(Color(181, 136, 99))
     ) {
-        MilkteaTopBar(navController)
+        JuiceTopBar(navController)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -52,6 +57,7 @@ fun MilkteaScreen(navController: NavController, context: Context) {
         } else {
             LazyColumn {
                 items(products.value) { product ->
+                    orderProducts.filter { it.productId == product.productId }
 
                     HorizontalDivider(
                         color = Color.White,
@@ -60,7 +66,7 @@ fun MilkteaScreen(navController: NavController, context: Context) {
                             .padding(vertical = 8.dp)
                             .padding(start = 16.dp, end = 16.dp)
                     )
-                    ProductRow(navController, product)
+                    ProductRow(navController, product, orderProducts)
 
                 }
             }
@@ -70,9 +76,9 @@ fun MilkteaScreen(navController: NavController, context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MilkteaTopBar(navController: NavController) {
+fun JuiceTopBar(navController: NavController) {
     CenterAlignedTopAppBar(
-        title = { Text("Milktea Products") },
+        title = { Text("Juice Products") },
         navigationIcon = {
             IconButton(onClick = { navController.navigateUp() }) {
                 Icon(
@@ -90,7 +96,7 @@ fun MilkteaTopBar(navController: NavController) {
 }
 
 //@Composable
-//fun MilkteaProductRow(product: Product) {
+//fun JuiceProductRow(product: Product) {
 //    val showDialog = remember { mutableStateOf(false) }
 //    val quantity = remember { mutableStateOf(1) }
 //    val tablenumber = remember { mutableStateOf("") }
