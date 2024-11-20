@@ -1,6 +1,7 @@
 package com.example.taco.MainLayout.MenuType.Cake
 
 import CustomerDatabase
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -49,12 +50,12 @@ import java.util.Date
 @Composable
 fun CakeScreen(navController: NavController) {
     val firestoreHelper = remember { FirestoreHelper() }
-    var products = remember { mutableStateOf<List<Product>>(emptyList()) }
+    var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val orderProducts = remember { mutableStateListOf<OrderProduct>() }
     LaunchedEffect(Unit) {
         isLoading = true
-        products.value = firestoreHelper.getAllProducts().filter {
+        products = firestoreHelper.getAllProducts().filter {
             it.name.contains("cake", ignoreCase = true)
         }
 
@@ -81,17 +82,27 @@ fun CakeScreen(navController: NavController) {
                     .padding(16.dp)
             )
         } else {
-            LazyColumn {
-                items(products.value) { product ->
-                    orderProducts.filter { it.productId == product.productId }
-                    HorizontalDivider(
-                        color = Color.White,
-                        thickness = 1.dp,
-                        modifier = Modifier
-                            .padding(vertical = 8.dp)
-                            .padding(start = 16.dp, end = 16.dp)
-                    )
-                    ProductRow(navController, product, orderProducts)
+            if (products.isEmpty()) {
+                Text(
+                    text = "Chưa có sản phẩm nào trong hệ thống.",
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(products) { product ->
+                        orderProducts.filter { it.productId == product.productId }
+                        HorizontalDivider(
+                            color = Color.White,
+                            thickness = 1.dp,
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .padding(start = 16.dp, end = 16.dp)
+                        )
+                        ProductRow(navController, product, orderProducts)
+                    }
                 }
             }
         }
@@ -131,13 +142,24 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
     val firestoreHelper = remember { FirestoreHelper() }
     val coroutineScope = rememberCoroutineScope()
     val productName = remember { mutableStateOf(product.name) }
-    val imageBitmap = product.image?.let { firestoreHelper.base64ToBitmap(it)?.asImageBitmap() }
+    var currentImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     val sqlite = CustomerDatabase(LocalContext.current)
+    val context = LocalContext.current
     val customers = sqlite.getAllCustomers()[0]
     val name = customers.customerName
     val phoneNumber = customers.customerNumPhone
     val showDialogCart = remember { mutableStateOf(false) } // Biến điều khiển hộp thoại thành công
     val orderCount = remember { mutableStateOf(0) } // Biến để lưu số lượng sản phẩm trong giỏ hàng
+
+    // Load product image from Firebase Storage
+    LaunchedEffect(product.image) {
+        product.image?.let { imageUrl ->
+            firestoreHelper.loadImageFromStorage(imageUrl, context) { bitmap ->
+                currentImageBitmap = bitmap
+            }
+        }
+    }
+
     // Hiển thị hộp thoại thêm vào giỏ hàng
     if (showDialog.value) {
         AlertDialog(
@@ -189,7 +211,7 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
                             val already = firestoreHelper.getAllOrderProducts().filter {
                                 it.phoneNumber == phoneNumber && it.productId == product.productId
                             }
-                            if(already.isNotEmpty()){
+                            if (already.isNotEmpty()) {
                                 productName.value = already.first().productId
                                 val updateOrderProduct = OrderProduct(
                                     orderId = already.first().orderId,
@@ -206,8 +228,7 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
                                 )
                                 firestoreHelper.updateOrderProductById(already.first().orderId, updateOrderProduct)
                                 orderCount.value = firestoreHelper.getAllOrderProducts().count { it.phoneNumber == phoneNumber }
-                            }
-                            else{
+                            } else {
                                 val newOrderProduct = OrderProduct(
                                     orderId = "",
                                     productId = product.productId,
@@ -247,7 +268,6 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
 
     // Hiển thị thông báo thành công khi thêm sản phẩm
     if (showDialogCart.value) {
-
         AlertDialog(
             properties = DialogProperties(
                 dismissOnBackPress = false, // Không cho phép đóng khi nhấn phím back
@@ -296,7 +316,7 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
                 Column(
                     modifier = Modifier
                         .fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Button(
                         onClick = {
@@ -339,13 +359,24 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            imageBitmap?.let {
-                Image(bitmap = it, contentDescription = "Product Image",
+            // Hiển thị hình ảnh sản phẩm từ Firebase Storage (nếu có)
+            currentImageBitmap?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = "Product Image",
                     modifier = Modifier
                         .size(70.dp)
                         .clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
+            } ?: Box(
+                modifier = Modifier
+                    .size(70.dp)
+                    .clip(CircleShape)
+                    .background(Color.Gray),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No Image", color = Color.White, fontSize = 10.sp)
             }
 
             Column(modifier = Modifier.padding(16.dp)) {
@@ -377,6 +408,8 @@ fun ProductRow(navController: NavController, product: Product, orderProduct: Lis
         }
     }
 }
+
+
 
 
 

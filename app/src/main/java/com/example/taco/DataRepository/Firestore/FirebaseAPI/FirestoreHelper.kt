@@ -1,24 +1,91 @@
 package com.example.taco.DataRepository.Firestore.FirebaseAPI
 
-import android.content.ContentValues.TAG
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Base64
+import android.net.Uri
 import android.util.Log
+import androidx.core.graphics.drawable.toBitmap
+import coil.ImageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.type.DateTime
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
-import java.io.ByteArrayOutputStream
-import java.time.LocalDateTime
 import java.util.Date
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.MultiFormatWriter
-import com.google.zxing.common.BitMatrix
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.util.UUID
 
 class FirestoreHelper {
-
     private val db = FirebaseFirestore.getInstance()
+
+    private val storage = FirebaseStorage.getInstance()
+    private val storageRef = storage.reference
+
+    fun uploadImageToStorage(imageUrl: String, onComplete: (String?) -> Unit) {
+        val imageRef = storageRef.child("images/${System.currentTimeMillis()}.jpg")
+        val uri = Uri.parse(imageUrl)  // Chuyển đổi chuỗi thành Uri
+
+        imageRef.putFile(uri)
+            .addOnSuccessListener {
+                imageRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                    onComplete(downloadUri.toString()) // Trả về URL của hình ảnh đã upload
+                }
+            }
+            .addOnFailureListener {
+                onComplete(null)
+            }
+    }
+
+    fun uploadImageToFirebase(
+        context: Context,
+        imageBitmap: Bitmap,
+        onSuccess: (String) -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        // Tạo đường dẫn ngẫu nhiên cho ảnh trong Firebase Storage
+        val storageRef = FirebaseStorage.getInstance().reference.child("images/${UUID.randomUUID()}.jpg")
+
+        // Chuyển đổi ảnh Bitmap thành ByteArray
+        val baos = ByteArrayOutputStream()
+        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos)
+        val imageData = baos.toByteArray()
+
+        // Thực hiện tải ảnh lên Firebase Storage
+        val uploadTask = storageRef.putBytes(imageData)
+        uploadTask.addOnSuccessListener {
+            // Lấy URL của ảnh sau khi tải lên thành công
+            storageRef.downloadUrl.addOnSuccessListener { uri ->
+                onSuccess(uri.toString())  // Gọi callback với URL của ảnh
+            }.addOnFailureListener { exception ->
+                onFailure(exception)  // Gọi callback khi thất bại trong việc lấy URL
+            }
+        }.addOnFailureListener { exception ->
+            // Gọi callback khi tải ảnh thất bại
+            onFailure(exception)
+        }
+    }
+
+    // Load image from Firebase Storage URL
+    fun loadImageFromStorage(imageUrl: String, context: Context, onComplete: (Bitmap?) -> Unit) {
+
+        val imageRef = storage.getReferenceFromUrl(imageUrl)
+        val ONE_MEGABYTE: Long = 5 * 1024 * 1024
+
+        imageRef.getBytes(ONE_MEGABYTE)
+
+            .addOnSuccessListener { bytes ->
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                onComplete(bitmap)
+            }
+            .addOnFailureListener {
+                onComplete(null)
+            }
+
+    }
 
     // Add Customer
     fun addCustomer(customer: Customer) {
@@ -112,69 +179,39 @@ class FirestoreHelper {
             }
         }
     }
+    suspend fun loadImageFromUri(context: Context, uri: String): Bitmap? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = ImageRequest.Builder(context) // Giả định bạn có `context`
+                    .data(uri)
+                    .build()
 
-
-
-    fun base64ToBitmap(base64String: String): Bitmap? {
-        return try {
-            val decodedString = Base64.decode(base64String, Base64.DEFAULT)
-
-            // Define the maximum width and height
-            val maxWidth = 800 // Set your desired maximum width
-            val maxHeight = 800 // Set your desired maximum height
-
-            // Khởi tạo options để giải mã ảnh
-            val options = BitmapFactory.Options()
-            options.inJustDecodeBounds = true  // Chỉ đọc kích thước ảnh mà không tải thực tế vào bộ nhớ
-            BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size, options)
-
-            // Tính toán kích thước mẫu
-            options.inSampleSize = calculateInSampleSize(options, maxWidth, maxHeight) // maxWidth, maxHeight là kích thước bạn muốn
-            options.inJustDecodeBounds = false // Bây giờ đọc thật sự ảnh vào bộ nhớ
-            BitmapFactory.decodeByteArray(decodedString, 0, decodedString.size, options)
-        } catch (e: IllegalArgumentException) {
-            null
-        }
-    }
-
-    // Tính toán kích thước mẫu
-    fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
-        // Kích thước gốc của ảnh
-        val height = options.outHeight
-        val width = options.outWidth
-        var inSampleSize = 1
-
-        if (height > reqHeight || width > reqWidth) {
-            val halfHeight: Int = height / 2
-            val halfWidth: Int = width / 2
-
-            // Tính toán inSampleSize
-            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-                inSampleSize *= 2
+                val result = ImageLoader(context).execute(request) as SuccessResult
+                result.drawable.toBitmap() // Chuyển đổi Drawable thành Bitmap
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null // Trả về null nếu có lỗi
             }
         }
-        return inSampleSize
     }
-
-
-    fun bitmapToBase64(bitmap: Bitmap): String {
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-        val byteArray = byteArrayOutputStream.toByteArray()
-        return Base64.encodeToString(byteArray, Base64.DEFAULT)
-    }
-
-
     // Add Product
-    fun addProduct(product: Product) {
+    fun addProduct(product: Product, onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
         val productMap = hashMapOf(
             "name" to product.name,
             "price" to product.price,
             "oldPrice" to product.oldPrice,
             "image" to product.image
         )
+
         db.collection("Product").add(productMap)
+            .addOnSuccessListener {
+                onSuccess()  // Gọi hàm khi thêm sản phẩm thành công
+            }
+            .addOnFailureListener { exception ->
+                onFailure(exception)  // Gọi hàm khi có lỗi
+            }
     }
+
 
 
     // Get All Products
@@ -204,24 +241,57 @@ class FirestoreHelper {
             )
         } else null
     }
-    fun updateProductById(productId: String, updatedProduct: Product) {
-        // Tạo một map chứa các trường cần cập nhật
-        val updatedProductMap = hashMapOf<String, Any?>(
-            "name" to updatedProduct.name,
-            "price" to updatedProduct.price,
-            "oldPrice" to updatedProduct.oldPrice,
-            "image" to updatedProduct.image
-        )
+    // Update Product with new image
+    fun updateProductById(
+        productId: String,
+        updatedProduct: Product,
+        newImageUri: String?
+    ) {
+        val productRef = db.collection("Product").document(productId)
 
-        // Cập nhật dữ liệu cho sản phẩm với productId trong Firestore
+        // Lấy thông tin sản phẩm hiện tại để kiểm tra xem có cần xóa ảnh cũ không
+        productRef.get().addOnSuccessListener { document ->
+            val oldImageUrl = document.getString("image")
+
+            // Xóa ảnh cũ nếu có và có hình ảnh mới
+            if (oldImageUrl != null && newImageUri != null) {
+                FirebaseStorage.getInstance().getReferenceFromUrl(oldImageUrl).delete()
+                    .addOnFailureListener {
+                        Log.e("FirestoreHelper", "Không thể xoá ảnh cũ: $it")
+                    }
+            }
+
+            // Nếu có ảnh mới, tải ảnh lên trước khi cập nhật
+            if (newImageUri != null) {
+                val newImageRef = storageRef.child("images/${UUID.randomUUID()}.jpg")
+                newImageRef.putFile(Uri.parse(newImageUri)).addOnSuccessListener {
+                    newImageRef.downloadUrl.addOnSuccessListener { uri ->
+                        updatedProduct.image = uri.toString()
+                        // Cập nhật sản phẩm với URL hình ảnh mới
+                        productRef.set(updatedProduct.toMap())
+                            .addOnSuccessListener { Log.d("FirestoreHelper", "Sản phẩm đã được cập nhật") }
+                            .addOnFailureListener { Log.e("FirestoreHelper", "Cập nhật thất bại: $it") }
+                    }
+                }.addOnFailureListener {
+                    Log.e("FirestoreHelper", "Tải ảnh mới lên thất bại: $it")
+                }
+            } else {
+                // Nếu không có ảnh mới, chỉ cập nhật thông tin sản phẩm
+                productRef.set(updatedProduct.toMap())
+                    .addOnSuccessListener { Log.d("FirestoreHelper", "Sản phẩm đã được cập nhật") }
+                    .addOnFailureListener { Log.e("FirestoreHelper", "Cập nhật thất bại: $it") }
+            }
+        }
+    }
+
+
+    private fun updateProductInFirestore(productId: String, updatedProductMap: Map<String, Any?>) {
         db.collection("Product").document(productId)
             .update(updatedProductMap)
             .addOnSuccessListener {
-                // Thành công
                 println("Product updated successfully!")
             }
             .addOnFailureListener { e ->
-                // Thất bại
                 println("Error updating product: $e")
             }
     }
@@ -290,9 +360,26 @@ class FirestoreHelper {
     }
 
     // Delete Product by ID
-    fun deleteProductById(productId: String) {
-        db.collection("Product").document(productId).delete()
+    fun deleteProductById(productId: String, imageUrl: String, onComplete: (Boolean) -> Unit) {
+        val storageRef = FirebaseStorage.getInstance().getReferenceFromUrl(imageUrl)
+
+        // Xoá hình ảnh từ Firebase Storage
+        storageRef.delete().addOnSuccessListener {
+            // Sau khi xoá ảnh thành công, tiến hành xoá sản phẩm trong Firestore
+            db.collection("Product").document(productId).delete()
+                .addOnSuccessListener {
+                    onComplete(true) // Xoá thành công
+                }
+                .addOnFailureListener { e ->
+                    onComplete(false) // Xoá sản phẩm thất bại
+                    Log.e("Firestore", "Error deleting product document", e)
+                }
+        }.addOnFailureListener { e ->
+            onComplete(false) // Xoá hình ảnh thất bại
+            Log.e("FirebaseStorage", "Error deleting image", e)
+        }
     }
+
 
     suspend fun updateOrderProductByFilterList(orderProductList: List<OrderProduct>, isPayCheck: Boolean) {
         val db = FirebaseFirestore.getInstance()
@@ -382,11 +469,13 @@ class FirestoreHelper {
 
 data class Product(
     val productId: String = "",
-    val name: String = "",
-    val price: Double = 0.0,
-    val oldPrice: Double? = null,
-    val image: String? = null // Thay đổi từ ByteArray thành String (URL hoặc base64)
-)
+    var name: String = "",
+    var price: Double = 0.0,
+    var oldPrice: Double? = null,
+    var image: String? = null // Thay đổi từ ByteArray thành String (URL hoặc base64)
+){
+    fun toMap() = hashMapOf("name" to name, "price" to price, "oldPrice" to oldPrice, "image" to image)
+}
 
 data class OrderProduct(
     val orderId: String = "",
@@ -403,12 +492,6 @@ data class OrderProduct(
     val isPayCheck : Boolean = false
 )
 
-data class OrderHistory(
-    val orderHistoryId: String = "",
-    val orderHistoryDate: Date = Date(),
-    val orderId: String = "",
-    val totalPrice: Double = 0.0
-)
 
 data class Customer (
     val id: String = "",
@@ -423,6 +506,21 @@ data class Revenue(
     val cusName: String = "",
     val cusPhone: String = "",
     val totalPrice: Double = 0.0
+)
+
+data class HOrderProduct(
+    val orderId: String = "",
+    val productId: String = "",
+    val cusName: String = "",
+    val phoneNumber: String = "",
+    val isProblem: Boolean = false,
+    val quantity: Int = 0,
+    val totalPrice: Double = 0.0,
+    val note: String = "",
+    val orderDone: Boolean = false,
+    val startOrderTime: Date = Date(),
+    val orderCompletedTime: Date = Date(),
+    val isPayCheck : Boolean = false
 )
 
 data class Feedback(

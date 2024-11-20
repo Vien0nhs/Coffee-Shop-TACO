@@ -1,6 +1,7 @@
 package com.example.taco.MainLayout.Home
 
 import CustomerDatabase
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -127,75 +128,108 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
     val note = remember { mutableStateOf(orderProduct.note) }
     val firestoreHelper = remember { FirestoreHelper() }
     val sqlite = CustomerDatabase(LocalContext.current)
+    val context = LocalContext.current
     val customers = sqlite.getAllCustomers()
     val name = customers[0].customerName
     val phone = customers[0].customerNumPhone
     val coroutineScope = rememberCoroutineScope() // Tạo coroutine scope
+    var currentImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Load product image from Firebase Storage
+    LaunchedEffect(product.image) {
+        product.image?.let { imageUrl ->
+            firestoreHelper.loadImageFromStorage(imageUrl, context) { bitmap ->
+                currentImageBitmap = bitmap
+            }
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
     ) {
-        // Hiển thị các sản phẩm trong giỏ ( Phần thô )
-        Row{
-            // Display product image
-            product.image?.let { imageBase64 ->
-                val bitmap = firestoreHelper.base64ToBitmap(imageBase64)
-                bitmap?.let {
-                    Image(
-                        bitmap = it.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+        // Hiển thị các sản phẩm trong giỏ
+        Row {
+            // Hiển thị hình ảnh sản phẩm từ Firebase Storage (nếu có)
+            currentImageBitmap?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } ?: Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .background(Color.Gray),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No Image", color = Color.White)
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Display product and order details in columns
+            // Hiển thị thông tin sản phẩm và chi tiết đơn hàng
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = 8.dp)
             ) {
-                Text(text = product.name , color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    text = product.name,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider(
                     color = Color.Black,
                     thickness = 1.dp,
                     modifier = Modifier
-                        .padding( end = 16.dp)
+                        .padding(end = 16.dp)
                 )
                 Text(
                     text = "Price: ${String.format("%.3f", product.price)} VND" + " x(${orderProduct.quantity})",
                     color = Color.Black,
                     style = MaterialTheme.typography.bodyMedium
                 )
-
-                Text(text = "Tổng giá: ${String.format("%.3f", orderProduct.totalPrice)} VND",color = Color.Black, fontSize = 14.sp)
+                Text(
+                    text = "Tổng giá: ${String.format("%.3f", orderProduct.totalPrice)} VND",
+                    color = Color.Black,
+                    fontSize = 14.sp
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider(
                     color = Color.Black,
                     thickness = 1.dp,
                     modifier = Modifier
-                        .padding( end = 16.dp)
+                        .padding(end = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row{
-                    Text(text = "Ghi chú: ",color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(text = "${orderProduct.note}", color = Color.White, fontSize = 14.sp)
+                Row {
+                    Text(
+                        text = "Ghi chú: ",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "${orderProduct.note}",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
                 }
             }
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                IconButton(
-                    onClick = { showDialog.value = true }
-                ) {
+                IconButton(onClick = { showDialog.value = true }) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit Order Product",
@@ -207,9 +241,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center
                 )
-                IconButton(
-                    onClick = { showDialog2.value = true }
-                ) {
+                IconButton(onClick = { showDialog2.value = true }) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete Order Product",
@@ -223,6 +255,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                 )
             }
         }
+
         // Hiển thị hộp thoại xoá
         if (showDialog2.value) {
             AlertDialog(
@@ -235,7 +268,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                         onClick = {
                             // Call the Firestore delete method
                             coroutineScope.launch {
-                                firestoreHelper.deleteOrderProductById(orderProduct.orderId) // Kiểm tra orderId ở đây
+                                firestoreHelper.deleteOrderProductById(orderProduct.orderId)
                             }
                             showDialog2.value = false
                             // Optionally, trigger a refresh of the product list
@@ -246,14 +279,13 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                     }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { showDialog2.value = false }
-                    ) {
+                    TextButton(onClick = { showDialog2.value = false }) {
                         Text("Huỷ", color = Color.White)
                     }
                 }
             )
         }
+
         // Hiển thị hộp thoại sửa
         if (showDialog.value) {
             AlertDialog(
@@ -264,7 +296,12 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(text = "Món: ${product.name}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                        Text(
+                            text = "Món: ${product.name}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color.White
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -280,9 +317,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
-                            IconButton(onClick = {
-                                quantity.value += 1
-                            }) {
+                            IconButton(onClick = { quantity.value += 1 }) {
                                 Icon(Icons.Default.Add, contentDescription = "Tăng")
                             }
                         }
@@ -307,7 +342,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                             // Tính tổng giá
                             val totalPrice = product.price * quantity.value
 
-                            // Tạo đối tượng OrderProduct với các thông tin cần thiết, ngoại trừ orderId
+                            // Tạo đối tượng OrderProduct với các thông tin cần thiết
                             val updatedOrderProduct = OrderProduct(
                                 orderId = orderProduct.orderId,
                                 productId = product.productId,
@@ -323,7 +358,8 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
                             }
                             navController.navigate("cart")
                             showDialog.value = false
-                        }) {
+                        }
+                    ) {
                         Text("OK")
                     }
                 },
@@ -338,6 +374,7 @@ fun CartItemRow(navController: NavController, orderProduct: OrderProduct, produc
         }
     }
 }
+
 
 // TopBar
 @OptIn(ExperimentalMaterial3Api::class)

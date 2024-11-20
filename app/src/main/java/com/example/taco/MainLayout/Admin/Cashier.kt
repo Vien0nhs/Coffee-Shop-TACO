@@ -1,6 +1,7 @@
 package com.example.taco.MainLayout.Admin
 
 import CustomerDatabase
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,9 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,7 @@ import com.example.taco.DataRepository.Firestore.FirebaseAPI.Customer
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.OrderProduct
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
+import com.example.taco.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -104,7 +108,7 @@ fun CashierScreen(navController: NavController) {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "Thu ngân",
+                            "Thu Ngân",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
@@ -161,7 +165,7 @@ fun CashierScreen(navController: NavController) {
             )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp)
             ) {
                 if (groupedOrderProducts.isEmpty()) {
@@ -183,8 +187,10 @@ fun CashierScreen(navController: NavController) {
                         }
                     }
                 } else {
-                    // Lặp qua các nhóm orderProducts
-                    items(groupedOrderProducts.keys.toList().sortedBy { groupedOrderProducts.getValue(it).first().isPayCheck }) { phoneNumber ->
+                    // Lặp qua các nhóm orderProducts;
+                    items(groupedOrderProducts.keys.toList()
+                        .filter { groupedOrderProducts.getValue(it).first().isPayCheck } // Lọc các order có isPayCheck = true
+                    ) { phoneNumber ->
                         var orders = groupedOrderProducts[phoneNumber] ?: emptyList()
                         val customer = customers.find { it.phoneNumber == phoneNumber }
                         if (customer != null) {
@@ -197,6 +203,57 @@ fun CashierScreen(navController: NavController) {
                             )
                             // Chọn order đầu tiên để hiển thị
                             CashierItemRow(navController, orders, customer, products)
+
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(
+                color = Color.Green,
+                thickness = 5.dp,
+                modifier = Modifier
+                    .padding(vertical = 8.dp, horizontal = 8.dp)
+                    .padding(start = 16.dp, end = 16.dp)
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp)
+            ) {
+                if (groupedOrderProducts.isEmpty()) {
+                    // Nếu không có sản phẩm nào
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 300.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Chưa có đơn hàng.",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                } else {
+                    // Lặp qua các nhóm orderProducts;
+                    items(groupedOrderProducts.keys.toList()
+                        .filter { !groupedOrderProducts.getValue(it).first().isPayCheck } // Lọc các order có isPayCheck = false
+                    ) { phoneNumber ->
+                        var orders = groupedOrderProducts[phoneNumber] ?: emptyList()
+                        val customer = customers.find { it.phoneNumber == phoneNumber }
+                        if (customer != null) {
+                            // Chọn order đầu tiên để hiển thị
+                            CashierItemRow(navController, orders, customer, products)
+                            HorizontalDivider(
+                                color = Color.White,
+                                thickness = 1.dp,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .padding(start = 16.dp, end = 16.dp)
+                            )
                         }
                     }
                 }
@@ -256,6 +313,7 @@ fun CashierItemRow(navController: NavController,
                             try {
                                 firestoreHelper.updateOrderProductByFilterList(orderProducts, true)
                                 showCheckDialog = false // Reset dialog sau khi hoàn tất
+                                navController.navigate("cashier")
                             } catch (e: Exception) {
                                 Log.e("FirestoreError", "Lỗi khi cập nhật trạng thái: ${e.message}")
                             }
@@ -381,8 +439,13 @@ fun CashierItemRow(navController: NavController,
 
 // Hộp thoại chi tiết đơn hàng
 @Composable
-fun OrderDetailsDialog(customer: Customer, showDialog: MutableState<Boolean>, orderProducts: List<OrderProduct>, products: List<Product>) {
-
+fun OrderDetailsDialog(
+    customer: Customer,
+    showDialog: MutableState<Boolean>,
+    orderProducts: List<OrderProduct>,
+    products: List<Product>
+) {
+    val context = LocalContext.current // Lấy context từ Composable
     AlertDialog(
         onDismissRequest = { showDialog.value = false },
         title = { Text("Chi tiết đơn hàng của khách ${customer.cusName}") },
@@ -390,15 +453,32 @@ fun OrderDetailsDialog(customer: Customer, showDialog: MutableState<Boolean>, or
             LazyColumn {
                 items(orderProducts) { orderProduct ->
                     val product = products.find { it.productId == orderProduct.productId }
-                    val imageBitmap = product?.image?.let {
-                        FirestoreHelper().base64ToBitmap(it)?.asImageBitmap()
+                    var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+                    // Tải hình ảnh từ Firestore
+                    LaunchedEffect(product?.image) {
+                        product?.image?.let { uri ->
+                            imageBitmap = FirestoreHelper().loadImageFromUri(context, uri)
+                        }
                     }
+
                     Column {
                         product?.let {
-                            imageBitmap?.let {
+                            // Hiển thị hình ảnh nếu đã tải xong
+                            imageBitmap?.let { bitmap ->
                                 Image(
-                                    bitmap = it,
+                                    bitmap = bitmap.asImageBitmap(),
                                     contentDescription = "Product Image",
+                                    modifier = Modifier
+                                        .size(70.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } ?: run {
+                                // Hiển thị một hình ảnh mặc định nếu không có hình ảnh
+                                Image(
+                                    bitmap = ImageBitmap.imageResource(id = R.drawable.cfb), // Thay đổi default_image bằng ID hình ảnh mặc định của bạn
+                                    contentDescription = "Default Product Image",
                                     modifier = Modifier
                                         .size(70.dp)
                                         .clip(CircleShape),

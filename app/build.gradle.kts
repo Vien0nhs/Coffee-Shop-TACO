@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.play.services.mlkit.barcode.scanning)
     implementation(libs.androidx.camera.view)
+    implementation(libs.firebase.storage.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -88,6 +89,7 @@ dependencies {
     implementation ("com.google.accompanist:accompanist-permissions:0.30.1")
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
     implementation ("com.google.firebase:firebase-auth:21.1.0")
+    implementation ("io.coil-kt:coil-compose:2.0.0")
 
 
 

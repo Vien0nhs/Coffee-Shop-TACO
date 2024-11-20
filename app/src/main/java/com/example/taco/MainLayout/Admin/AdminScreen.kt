@@ -1,6 +1,7 @@
 package com.example.taco.MainLayout.Admin
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -20,14 +21,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-//import com.example.taco.Data.DatabaseTACO
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.FirestoreHelper
 import com.example.taco.DataRepository.Firestore.FirebaseAPI.Product
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
@@ -71,7 +74,7 @@ fun ManageProductsScreen(navController: NavController, context: Context) {
     // State to hold the list of products
     var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
-
+    val coroutineScope = rememberCoroutineScope()
     // Fetch products from Firestore
     LaunchedEffect(searchQuery) {
         isLoading = true
@@ -122,50 +125,70 @@ fun ManageProductsScreen(navController: NavController, context: Context) {
                     .padding(16.dp)
             )
         } else {
-            LazyColumn {
-                items(products) { product ->
-                    HorizontalDivider(
-                        color = Color.White,
-                        thickness = 1.dp,
-                        modifier = Modifier
-                            .padding(vertical = 8.dp)
-                            .padding(start = 16.dp, end = 16.dp)
-                    )
-                    ProductRow(
-                        product = product,
-                        onUpdate = { productId ->
-                            navController.navigate("updateDetail/$productId")
-                        },
-                        onDelete = { productId ->
-                            firestoreHelper.deleteProductById(productId)
-                            // Refresh product list after deletion
-                            LaunchedEffect(Unit) {
-                                products = firestoreHelper.getAllProducts().filter {
-                                    it.name.contains(searchQuery, ignoreCase = true)
+            if (products.isEmpty()) {
+                Text(
+                    text = "Chưa có sản phẩm nào trong hệ thống.",
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(products.sortedBy { it.name }) { product ->
+                        HorizontalDivider(
+                            color = Color.White,
+                            thickness = 1.dp,
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .padding(start = 16.dp, end = 16.dp)
+                        )
+                        ProductRow(
+                            product = product,
+                            onUpdate = { productId ->
+                                navController.navigate("updateDetail/$productId")
+                            },
+                            onDelete = { productId ->
+                                product.image?.let { imageUrl ->
+                                    firestoreHelper.deleteProductById(productId, imageUrl) { success ->
+                                        if (success) {
+                                            coroutineScope.launch {
+                                                products = firestoreHelper.getAllProducts().filter {
+                                                    it.name.contains(searchQuery, ignoreCase = true)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                            }
-                        },
-                        navController
-                    )
+                            },
+                            navController = navController
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-
-
 @Composable
 fun ProductRow(
     product: Product,
     onUpdate: (String) -> Unit,
-    onDelete: @Composable (String) -> Unit,
+    onDelete: (String) -> Unit,
     navController: NavController
 ) {
     val firestoreHelper = remember { FirestoreHelper() }
-
+    val context = LocalContext.current // Lấy context từ Composable
     var showDialog by remember { mutableStateOf(false) }
-    val imageBitmap = product.image?.let { firestoreHelper.base64ToBitmap(it)?.asImageBitmap() }
+    var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Use the image URL from Firestore
+    // Sử dụng LaunchedEffect để tải hình ảnh từ URI
+    LaunchedEffect(product.image) {
+        product.image?.let { uri ->
+            imageBitmap = firestoreHelper.loadImageFromUri(context, uri)
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -178,7 +201,9 @@ fun ProductRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             imageBitmap?.let {
-                Image(bitmap = it, contentDescription = "Product Image",
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = "Product Image",
                     modifier = Modifier
                         .size(70.dp)
                         .clip(CircleShape),
@@ -190,7 +215,7 @@ fun ProductRow(
                 modifier = Modifier
                     .padding(16.dp)
             ) {
-                Text(text = product.name, style = MaterialTheme.typography.bodyLarge)
+                Text(text = product.name, style = MaterialTheme.typography.titleLarge, color = Color.White)
                 Text(
                     text = "Price: ${String.format("%.3f", product.price)} VND",
                     style = MaterialTheme.typography.bodyMedium,
@@ -248,6 +273,7 @@ fun ProductRow(
             )
         }
     }
+
     if (showDialog) {
         AlertDialog(
             containerColor = Color(181, 136, 99),
@@ -258,7 +284,7 @@ fun ProductRow(
                 TextButton(
                     onClick = {
                         // Call the Firestore delete method
-                        firestoreHelper.deleteProductById(product.productId)
+                        onDelete(product.productId)
                         showDialog = false
                         // Optionally, trigger a refresh of the product list
                         navController.navigate("admin")

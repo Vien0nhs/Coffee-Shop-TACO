@@ -22,13 +22,13 @@ import com.example.taco.MainLayout.MenuType.Cake.ProductRow
 @Composable
 fun OtherDrinksScreen(navController: NavController, context: Context) {
     val firestoreHelper = remember { FirestoreHelper() }
-    var products = remember { mutableStateOf<List<Product>>(emptyList()) }
+    var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val orderProducts = remember { mutableStateListOf<OrderProduct>() }
 
     LaunchedEffect(Unit) {
         isLoading = true
-        products.value = firestoreHelper.getAllProducts().filter {
+        products = firestoreHelper.getAllProducts().filter {
             !it.name.contains("coffee", ignoreCase = true) &&
                     !it.name.contains("juice", ignoreCase = true) &&
                     !it.name.contains("milktea", ignoreCase = true) &&
@@ -58,21 +58,32 @@ fun OtherDrinksScreen(navController: NavController, context: Context) {
                     .padding(16.dp)
             )
         } else {
-            LazyColumn {
-                items(products.value) { product ->
-                    orderProducts.filter { it.productId == product.productId }
+            if (products.isEmpty()) {
+                Text(
+                    text = "Chưa có sản phẩm nào trong hệ thống.",
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(products) { product ->
+                        orderProducts.filter { it.productId == product.productId }
 
-                    HorizontalDivider(
-                        color = Color.White,
-                        thickness = 1.dp,
-                        modifier = Modifier
-                            .padding(vertical = 8.dp)
-                            .padding(start = 16.dp, end = 16.dp)
-                    )
-                    ProductRow(navController, product, orderProducts)
+                        HorizontalDivider(
+                            color = Color.White,
+                            thickness = 1.dp,
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .padding(start = 16.dp, end = 16.dp)
+                        )
+                        ProductRow(navController, product, orderProducts)
 
+                    }
                 }
             }
+
         }
     }
 }

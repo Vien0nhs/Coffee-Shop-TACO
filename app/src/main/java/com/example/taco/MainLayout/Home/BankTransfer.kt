@@ -1,6 +1,7 @@
 package com.example.taco.MainLayout.Home
 
 import CustomerDatabase
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -128,34 +129,50 @@ fun CheckoutItemRow(navController: NavController, orderProduct: OrderProduct, pr
     val note = remember { mutableStateOf(orderProduct.note) }
     val firestoreHelper = remember { FirestoreHelper() }
     val sqlite = CustomerDatabase(LocalContext.current)
+    val context = LocalContext.current
     val customers = sqlite.getAllCustomers()
     val name = customers[0].customerName
     val phone = customers[0].customerNumPhone
     val coroutineScope = rememberCoroutineScope() // Tạo coroutine scope
+    var currentImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Load product image from Firebase Storage
+    LaunchedEffect(product.image) {
+        product.image?.let { imageUrl ->
+            firestoreHelper.loadImageFromStorage(imageUrl, context) { bitmap ->
+                currentImageBitmap = bitmap
+            }
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
     ) {
-        // Hiển thị các sản phẩm trong giỏ ( Phần thô )
-        // Display product image
-        product.image?.let { imageBase64 ->
-            val bitmap = firestoreHelper.base64ToBitmap(imageBase64)
-            bitmap?.let {
-                Image(
-                    bitmap = it.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            }
+        // Hiển thị hình ảnh sản phẩm từ Firebase Storage (nếu có)
+        currentImageBitmap?.let {
+            Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } ?: Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(Color.Gray),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("No Image", color = Color.White)
         }
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Display product and order details in columns
+        // Hiển thị thông tin sản phẩm và chi tiết đơn hàng
         Column(
             modifier = Modifier
                 .padding(vertical = 8.dp)
@@ -166,7 +183,7 @@ fun CheckoutItemRow(navController: NavController, orderProduct: OrderProduct, pr
                 color = Color.Black,
                 thickness = 1.dp,
                 modifier = Modifier
-                    .padding( end = 75.dp)
+                    .padding(end = 75.dp)
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
@@ -181,7 +198,7 @@ fun CheckoutItemRow(navController: NavController, orderProduct: OrderProduct, pr
                 color = Color.Black,
                 thickness = 1.dp,
                 modifier = Modifier
-                    .padding( end = 75.dp)
+                    .padding(end = 75.dp)
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(text =  "Ghi chú: " + orderProduct.note , color = Color.White,
@@ -189,6 +206,7 @@ fun CheckoutItemRow(navController: NavController, orderProduct: OrderProduct, pr
         }
     }
 }
+
 
 // TopBar
 @OptIn(ExperimentalMaterial3Api::class)

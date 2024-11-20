@@ -326,7 +326,7 @@ fun BottomNavigationBar(navController: NavController, selectedTab: Int, onTabSel
 //            selected = selectedTab == 3,
 //            onClick = { onTabSelected(3) }
 //        )
-        if(Admin.adminMode){ //isAdminCheck.value
+        if(Admin.adminMode){ //
             NavigationBarItem(
                 icon = { Icon(Icons.Filled.Person, contentDescription = "Admin") },
                 label = { Text("Admin", color = Color.White) },
