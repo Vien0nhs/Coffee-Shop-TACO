@@ -46,7 +46,29 @@
       <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
     </div>
     <p id="load">Firebase SDK Loading&hellip;</p>
+    <script>
+      // Lấy dữ liệu sản phẩm từ Firestore
+      function getAllProducts() {
+        const db = firebase.firestore();
+        const productList = document.getElementById('product-list');
 
+        db.collection("products").get().then((querySnapshot) => {
+          querySnapshot.forEach((doc) => {
+            const product = doc.data();
+            const listItem = document.createElement('li');
+            listItem.textContent = `${product.name} - $${product.price} - ${product.description}`;
+            productList.appendChild(listItem);
+          });
+        }).catch((error) => {
+          console.error("Error getting documents: ", error);
+        });
+      }
+
+      // Gọi hàm khi trang web đã sẵn sàng
+      document.addEventListener('DOMContentLoaded', function() {
+        getAllProducts();
+      });
+    </script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         const loadEl = document.querySelector('#load');

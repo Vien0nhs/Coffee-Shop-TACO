@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     id("com.google.gms.google-services") version "4.4.2"
-
 }
 
 android {
@@ -90,6 +89,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
     implementation ("com.google.firebase:firebase-auth:21.1.0")
     implementation ("io.coil-kt:coil-compose:2.0.0")
+    implementation ("com.google.firebase:firebase-analytics-ktx")
+
 
 
 
